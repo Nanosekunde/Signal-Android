@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) 2016 Open Whisper Systems
  *
  * This program is free software: you can redistribute it and/or modify
@@ -17,41 +17,40 @@
 
 package org.thoughtcrime.securesms.notifications;
 
+import android.annotation.SuppressLint;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.v4.app.RemoteInput;
+import androidx.core.app.RemoteInput;
 
-import org.thoughtcrime.securesms.attachments.Attachment;
-import org.thoughtcrime.securesms.crypto.MasterSecret;
 import org.thoughtcrime.securesms.database.Address;
 import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.MessagingDatabase.MarkedMessageInfo;
-import org.thoughtcrime.securesms.database.RecipientDatabase.RecipientSettings;
 import org.thoughtcrime.securesms.mms.OutgoingMediaMessage;
 import org.thoughtcrime.securesms.recipients.Recipient;
 import org.thoughtcrime.securesms.sms.MessageSender;
+import org.thoughtcrime.securesms.sms.OutgoingEncryptedMessage;
 import org.thoughtcrime.securesms.sms.OutgoingTextMessage;
-import org.whispersystems.libsignal.util.guava.Optional;
 
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
 /**
  * Get the response text from the Wearable Device and sends an message as a reply
  */
-public class RemoteReplyReceiver extends MasterSecretBroadcastReceiver {
+public class RemoteReplyReceiver extends BroadcastReceiver {
 
   public static final String TAG           = RemoteReplyReceiver.class.getSimpleName();
   public static final String REPLY_ACTION  = "org.thoughtcrime.securesms.notifications.WEAR_REPLY";
   public static final String ADDRESS_EXTRA = "address";
+  public static final String REPLY_METHOD  = "reply_method";
 
+  @SuppressLint("StaticFieldLeak")
   @Override
-  protected void onReceive(final Context context, Intent intent,
-                           final @Nullable MasterSecret masterSecret)
-  {
+  public void onReceive(final Context context, Intent intent) {
     if (!REPLY_ACTION.equals(intent.getAction())) return;
 
     Bundle remoteInput = RemoteInput.getResultsFromIntent(intent);
@@ -59,9 +58,13 @@ public class RemoteReplyReceiver extends MasterSecretBroadcastReceiver {
     if (remoteInput == null) return;
 
     final Address      address      = intent.getParcelableExtra(ADDRESS_EXTRA);
+    final ReplyMethod  replyMethod  = (ReplyMethod) intent.getSerializableExtra(REPLY_METHOD);
     final CharSequence responseText = remoteInput.getCharSequence(MessageNotifier.EXTRA_REMOTE_REPLY);
 
-    if (masterSecret != null && responseText != null) {
+    if (address     == null) throw new AssertionError("No address specified");
+    if (replyMethod == null) throw new AssertionError("No reply method specified");
+
+    if (responseText != null) {
       new AsyncTask<Void, Void, Void>() {
         @Override
         protected Void doInBackground(Void... params) {
@@ -69,25 +72,36 @@ public class RemoteReplyReceiver extends MasterSecretBroadcastReceiver {
 
           Recipient recipient = Recipient.from(context, address, false);
           int  subscriptionId = recipient.getDefaultSubscriptionId().or(-1);
-          long expiresIn      = recipient.getExpireMessages() * 1000;
+          long expiresIn      = recipient.getExpireMessages() * 1000L;
 
-          if (recipient.isGroupRecipient()) {
-            OutgoingMediaMessage reply = new OutgoingMediaMessage(recipient, responseText.toString(), new LinkedList<Attachment>(), System.currentTimeMillis(), subscriptionId, expiresIn, 0);
-            threadId = MessageSender.send(context, masterSecret, reply, -1, false, null);
-          } else {
-            OutgoingTextMessage reply = new OutgoingTextMessage(recipient, responseText.toString(), expiresIn, subscriptionId);
-            threadId = MessageSender.send(context, masterSecret, reply, -1, false, null);
+          switch (replyMethod) {
+            case GroupMessage: {
+              OutgoingMediaMessage reply = new OutgoingMediaMessage(recipient, responseText.toString(), new LinkedList<>(), System.currentTimeMillis(), subscriptionId, expiresIn, false, 0, null, Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+              threadId = MessageSender.send(context, reply, -1, false, null);
+              break;
+            }
+            case SecureMessage: {
+              OutgoingEncryptedMessage reply = new OutgoingEncryptedMessage(recipient, responseText.toString(), expiresIn);
+              threadId = MessageSender.send(context, reply, -1, false, null);
+              break;
+            }
+            case UnsecuredSmsMessage: {
+              OutgoingTextMessage reply = new OutgoingTextMessage(recipient, responseText.toString(), expiresIn, subscriptionId);
+              threadId = MessageSender.send(context, reply, -1, true, null);
+              break;
+            }
+            default:
+              throw new AssertionError("Unknown Reply method");
           }
 
           List<MarkedMessageInfo> messageIds = DatabaseFactory.getThreadDatabase(context).setRead(threadId, true);
 
-          MessageNotifier.updateNotification(context, masterSecret);
+          MessageNotifier.updateNotification(context);
           MarkReadReceiver.process(context, messageIds);
 
           return null;
         }
       }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
-
   }
 }

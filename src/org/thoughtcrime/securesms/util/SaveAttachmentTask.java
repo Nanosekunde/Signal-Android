@@ -4,16 +4,16 @@ import android.content.Context;
 import android.content.DialogInterface.OnClickListener;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v7.app.AlertDialog;
-import android.util.Log;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import android.text.TextUtils;
 import android.webkit.MimeTypeMap;
 import android.widget.Toast;
 
 import org.thoughtcrime.securesms.R;
-import org.thoughtcrime.securesms.crypto.MasterSecret;
 import org.thoughtcrime.securesms.database.NoExternalStorageException;
+import org.thoughtcrime.securesms.logging.Log;
 import org.thoughtcrime.securesms.mms.PartAuthority;
 import org.thoughtcrime.securesms.util.task.ProgressDialogAsyncTask;
 import org.whispersystems.libsignal.util.Pair;
@@ -34,20 +34,18 @@ public class SaveAttachmentTask extends ProgressDialogAsyncTask<SaveAttachmentTa
   private static final int WRITE_ACCESS_FAILURE = 2;
 
   private final WeakReference<Context>      contextReference;
-  private final WeakReference<MasterSecret> masterSecretReference;
 
   private final int attachmentCount;
 
-  public SaveAttachmentTask(Context context, MasterSecret masterSecret) {
-    this(context, masterSecret, 1);
+  public SaveAttachmentTask(Context context) {
+    this(context, 1);
   }
 
-  public SaveAttachmentTask(Context context, MasterSecret masterSecret, int count) {
+  public SaveAttachmentTask(Context context, int count) {
     super(context,
           context.getResources().getQuantityString(R.plurals.ConversationFragment_saving_n_attachments, count, count),
           context.getResources().getQuantityString(R.plurals.ConversationFragment_saving_n_attachments_to_sd_card, count, count));
     this.contextReference      = new WeakReference<>(context);
-    this.masterSecretReference = new WeakReference<>(masterSecret);
     this.attachmentCount       = count;
   }
 
@@ -59,7 +57,6 @@ public class SaveAttachmentTask extends ProgressDialogAsyncTask<SaveAttachmentTa
 
     try {
       Context      context      = contextReference.get();
-      MasterSecret masterSecret = masterSecretReference.get();
       String       directory    = null;
 
       if (!StorageUtil.canWriteInSignalStorageDir()) {
@@ -72,7 +69,7 @@ public class SaveAttachmentTask extends ProgressDialogAsyncTask<SaveAttachmentTa
 
       for (Attachment attachment : attachments) {
         if (attachment != null) {
-          directory = saveAttachment(context, masterSecret, attachment);
+          directory = saveAttachment(context, attachment);
           if (directory == null) return new Pair<>(FAILURE, null);
         }
       }
@@ -85,7 +82,7 @@ public class SaveAttachmentTask extends ProgressDialogAsyncTask<SaveAttachmentTa
     }
   }
 
-  private @Nullable String saveAttachment(Context context, MasterSecret masterSecret, Attachment attachment)
+  private @Nullable String saveAttachment(Context context, Attachment attachment)
       throws NoExternalStorageException, IOException
   {
     String      contentType = MediaUtil.getCorrectedMimeType(attachment.contentType);
@@ -96,7 +93,7 @@ public class SaveAttachmentTask extends ProgressDialogAsyncTask<SaveAttachmentTa
 
     File    outputDirectory = createOutputDirectoryFromContentType(contentType);
     File          mediaFile = createOutputFile(outputDirectory, fileName);
-    InputStream inputStream = PartAuthority.getAttachmentStream(context, masterSecret, attachment.uri);
+    InputStream inputStream = PartAuthority.getAttachmentStream(context, attachment.uri);
 
     if (inputStream == null) {
       return null;
@@ -192,7 +189,9 @@ public class SaveAttachmentTask extends ProgressDialogAsyncTask<SaveAttachmentTa
                        Toast.LENGTH_LONG).show();
         break;
       case SUCCESS:
-        Toast.makeText(context, String.format("Saved to %s", result.second()), Toast.LENGTH_LONG).show();
+        String message = !TextUtils.isEmpty(result.second())  ? context.getResources().getString(R.string.SaveAttachmentTask_saved_to, result.second())
+                                                              : context.getResources().getString(R.string.SaveAttachmentTask_saved);
+        Toast.makeText(context, message, Toast.LENGTH_LONG).show();
         break;
       case WRITE_ACCESS_FAILURE:
         Toast.makeText(context, R.string.ConversationFragment_unable_to_write_to_sd_card_exclamation,

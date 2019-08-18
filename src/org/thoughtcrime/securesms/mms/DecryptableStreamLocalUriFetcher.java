@@ -4,11 +4,10 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.net.Uri;
-import android.util.Log;
+import org.thoughtcrime.securesms.logging.Log;
 
 import com.bumptech.glide.load.data.StreamLocalUriFetcher;
 
-import org.thoughtcrime.securesms.crypto.MasterSecret;
 import org.thoughtcrime.securesms.util.MediaUtil;
 
 import java.io.ByteArrayInputStream;
@@ -21,13 +20,11 @@ class DecryptableStreamLocalUriFetcher extends StreamLocalUriFetcher {
 
   private static final String TAG = DecryptableStreamLocalUriFetcher.class.getSimpleName();
 
-  private Context      context;
-  private MasterSecret masterSecret;
+  private Context context;
 
-  DecryptableStreamLocalUriFetcher(Context context, MasterSecret masterSecret, Uri uri) {
+  DecryptableStreamLocalUriFetcher(Context context, Uri uri) {
     super(context.getContentResolver(), uri);
     this.context      = context;
-    this.masterSecret = masterSecret;
   }
 
   @Override
@@ -43,7 +40,7 @@ class DecryptableStreamLocalUriFetcher extends StreamLocalUriFetcher {
     }
 
     try {
-      return PartAuthority.getAttachmentStream(context, masterSecret, uri);
+      return PartAuthority.getAttachmentStream(context, uri);
     } catch (IOException ioe) {
       Log.w(TAG, ioe);
       throw new FileNotFoundException("PartAuthority couldn't load Uri resource.");

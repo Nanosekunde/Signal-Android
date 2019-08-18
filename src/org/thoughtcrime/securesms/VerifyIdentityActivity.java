@@ -16,7 +16,6 @@
  */
 package org.thoughtcrime.securesms;
 
-import android.*;
 import android.Manifest;
 import android.animation.TypeEvaluator;
 import android.animation.ValueAnimator;
@@ -35,16 +34,15 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Vibrator;
-import android.support.annotation.DrawableRes;
-import android.support.annotation.NonNull;
-import android.support.annotation.RequiresApi;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentTransaction;
-import android.support.v7.widget.SwitchCompat;
+import androidx.annotation.DrawableRes;
+import androidx.annotation.NonNull;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentTransaction;
+import androidx.appcompat.widget.SwitchCompat;
 import android.text.Html;
 import android.text.TextUtils;
 import android.text.method.LinkMovementMethod;
-import android.util.Log;
+import org.thoughtcrime.securesms.logging.Log;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.LayoutInflater;
@@ -66,8 +64,6 @@ import org.thoughtcrime.securesms.color.MaterialColor;
 import org.thoughtcrime.securesms.components.camera.CameraView;
 import org.thoughtcrime.securesms.crypto.IdentityKeyParcelable;
 import org.thoughtcrime.securesms.crypto.IdentityKeyUtil;
-import org.thoughtcrime.securesms.crypto.MasterSecret;
-import org.thoughtcrime.securesms.crypto.MasterSecretUnion;
 import org.thoughtcrime.securesms.database.Address;
 import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.IdentityDatabase.VerifiedStatus;
@@ -92,6 +88,7 @@ import org.whispersystems.libsignal.fingerprint.NumericFingerprintGenerator;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
+import java.util.Locale;
 
 import static org.whispersystems.libsignal.SessionCipher.SESSION_LOCK;
 
@@ -122,7 +119,7 @@ public class VerifyIdentityActivity extends PassphraseRequiredActionBarActivity 
   }
 
   @Override
-  protected void onCreate(Bundle state, @NonNull MasterSecret masterSecret) {
+  protected void onCreate(Bundle state, boolean ready) {
     getSupportActionBar().setDisplayHomeAsUpEnabled(true);
     getSupportActionBar().setTitle(R.string.AndroidManifest__verify_safety_number);
 
@@ -142,7 +139,7 @@ public class VerifyIdentityActivity extends PassphraseRequiredActionBarActivity 
     scanFragment.setScanListener(this);
     displayFragment.setClickListener(this);
 
-    initFragment(android.R.id.content, displayFragment, masterSecret, dynamicLanguage.getCurrentLocale(), extras);
+    initFragment(android.R.id.content, displayFragment, dynamicLanguage.getCurrentLocale(), extras);
   }
 
   @Override
@@ -210,7 +207,6 @@ public class VerifyIdentityActivity extends PassphraseRequiredActionBarActivity 
     public static final String LOCAL_NUMBER    = "local_number";
     public static final String VERIFIED_STATE  = "verified_state";
 
-    private MasterSecret masterSecret;
     private Recipient    recipient;
     private String       localNumber;
     private String       remoteNumber;
@@ -234,7 +230,7 @@ public class VerifyIdentityActivity extends PassphraseRequiredActionBarActivity 
     private boolean    animateFailureOnDraw = false;
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup viewGroup, Bundle bundle) {
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup viewGroup, Bundle bundle) {
       this.container        = ViewUtil.inflate(inflater, viewGroup, R.layout.verify_display_fragment);
       this.numbersContainer = ViewUtil.findById(container, R.id.number_table);
       this.qrCode           = ViewUtil.findById(container, R.id.qr_code);
@@ -276,7 +272,6 @@ public class VerifyIdentityActivity extends PassphraseRequiredActionBarActivity 
       if (localIdentityParcelable == null)  throw new AssertionError("local identity required");
       if (remoteIdentityParcelable == null) throw new AssertionError("remote identity required");
 
-      this.masterSecret   = getArguments().getParcelable("master_secret");
       this.localNumber    = getArguments().getString(LOCAL_NUMBER);
       this.localIdentity  = localIdentityParcelable.get();
       this.remoteNumber   = getArguments().getString(REMOTE_NUMBER);
@@ -488,30 +483,25 @@ public class VerifyIdentityActivity extends PassphraseRequiredActionBarActivity 
     }
 
     private void setCodeSegment(final TextView codeView, String segment) {
-      if (Build.VERSION.SDK_INT >= 11) {
-        ValueAnimator valueAnimator = new ValueAnimator();
-        valueAnimator.setObjectValues(0, Integer.parseInt(segment));
+      ValueAnimator valueAnimator = new ValueAnimator();
+      valueAnimator.setObjectValues(0, Integer.parseInt(segment));
 
-        valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-          @RequiresApi(api = Build.VERSION_CODES.HONEYCOMB)
-          @Override
-          public void onAnimationUpdate(ValueAnimator animation) {
-            int value = (int) animation.getAnimatedValue();
-            codeView.setText(String.format("%05d", value));
-          }
-        });
+      valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+        @Override
+        public void onAnimationUpdate(ValueAnimator animation) {
+          int value = (int) animation.getAnimatedValue();
+          codeView.setText(String.format(Locale.getDefault(), "%05d", value));
+        }
+      });
 
-        valueAnimator.setEvaluator(new TypeEvaluator<Integer>() {
-          public Integer evaluate(float fraction, Integer startValue, Integer endValue) {
-            return Math.round(startValue + (endValue - startValue) * fraction);
-          }
-        });
+      valueAnimator.setEvaluator(new TypeEvaluator<Integer>() {
+        public Integer evaluate(float fraction, Integer startValue, Integer endValue) {
+          return Math.round(startValue + (endValue - startValue) * fraction);
+        }
+      });
 
-        valueAnimator.setDuration(1000);
-        valueAnimator.start();
-      } else {
-        codeView.setText(segment);
-      }
+      valueAnimator.setDuration(1000);
+      valueAnimator.start();
     }
 
     private String[] getSegments(Fingerprint fingerprint, int segmentCount) {
@@ -597,7 +587,7 @@ public class VerifyIdentityActivity extends PassphraseRequiredActionBarActivity 
         protected Void doInBackground(Recipient... params) {
           synchronized (SESSION_LOCK) {
             if (isChecked) {
-              Log.w(TAG, "Saving identity: " + params[0].getAddress());
+              Log.i(TAG, "Saving identity: " + params[0].getAddress());
               DatabaseFactory.getIdentityDatabase(getActivity())
                              .saveIdentity(params[0].getAddress(),
                                            remoteIdentity,
@@ -612,13 +602,12 @@ public class VerifyIdentityActivity extends PassphraseRequiredActionBarActivity 
 
             ApplicationContext.getInstance(getActivity())
                               .getJobManager()
-                              .add(new MultiDeviceVerifiedUpdateJob(getActivity(),
-                                                                    recipient.getAddress(),
+                              .add(new MultiDeviceVerifiedUpdateJob(recipient.getAddress(),
                                                                     remoteIdentity,
                                                                     isChecked ? VerifiedStatus.VERIFIED :
                                                                                 VerifiedStatus.DEFAULT));
 
-            IdentityUtil.markIdentityVerified(getActivity(), new MasterSecretUnion(masterSecret), recipient, isChecked, false);
+            IdentityUtil.markIdentityVerified(getActivity(), recipient, isChecked, false);
           }
           return null;
         }
@@ -633,7 +622,7 @@ public class VerifyIdentityActivity extends PassphraseRequiredActionBarActivity 
     private ScanningThread scanningThread;
     private ScanListener   scanListener;
 
-    public View onCreateView(LayoutInflater inflater, ViewGroup viewGroup, Bundle bundle) {
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup viewGroup, Bundle bundle) {
       this.container  = ViewUtil.inflate(inflater, viewGroup, R.layout.verify_scan_fragment);
       this.cameraView = ViewUtil.findById(container, R.id.scanner);
 

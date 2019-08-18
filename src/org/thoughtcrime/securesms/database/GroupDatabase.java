@@ -5,15 +5,16 @@ import android.annotation.SuppressLint;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteOpenHelper;
 import android.graphics.Bitmap;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import android.text.TextUtils;
 
 import com.annimon.stream.Stream;
 
+import net.sqlcipher.database.SQLiteDatabase;
+
+import org.thoughtcrime.securesms.database.helpers.SQLCipherOpenHelper;
 import org.thoughtcrime.securesms.recipients.Recipient;
 import org.thoughtcrime.securesms.util.BitmapUtil;
 import org.thoughtcrime.securesms.util.GroupUtil;
@@ -21,8 +22,8 @@ import org.thoughtcrime.securesms.util.Util;
 import org.whispersystems.libsignal.util.guava.Optional;
 import org.whispersystems.signalservice.api.messages.SignalServiceAttachmentPointer;
 
+import java.io.Closeable;
 import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -64,7 +65,7 @@ public class GroupDatabase extends Database {
           AVATAR_DIGEST + " BLOB, " +
           MMS + " INTEGER DEFAULT 0);";
 
-  static final String[] CREATE_INDEXS = {
+  public static final String[] CREATE_INDEXS = {
       "CREATE UNIQUE INDEX IF NOT EXISTS group_id_index ON " + TABLE_NAME + " (" + GROUP_ID + ");",
   };
 
@@ -75,7 +76,7 @@ public class GroupDatabase extends Database {
 
   static final List<String> TYPED_GROUP_PROJECTION = Stream.of(GROUP_PROJECTION).map(columnName -> TABLE_NAME + "." + columnName).toList();
 
-  public GroupDatabase(Context context, SQLiteOpenHelper databaseHelper) {
+  public GroupDatabase(Context context, SQLCipherOpenHelper databaseHelper) {
     super(context, databaseHelper);
   }
 
@@ -246,6 +247,10 @@ public class GroupDatabase extends Database {
 
     databaseHelper.getWritableDatabase().update(TABLE_NAME, contents, GROUP_ID + " = ?",
                                                 new String[] {groupId});
+
+    Recipient.applyCached(Address.fromSerialized(groupId), recipient -> {
+      recipient.setParticipants(Stream.of(members).map(a -> Recipient.from(context, a, false)).toList());
+    });
   }
 
   public void remove(String groupId, Address source) {
@@ -257,6 +262,14 @@ public class GroupDatabase extends Database {
 
     databaseHelper.getWritableDatabase().update(TABLE_NAME, contents, GROUP_ID + " = ?",
                                                 new String[] {groupId});
+
+    Recipient.applyCached(Address.fromSerialized(groupId), recipient -> {
+      List<Recipient> current = recipient.getParticipants();
+      Recipient       removal = Recipient.from(context, source, false);
+
+      current.remove(removal);
+      recipient.setParticipants(current);
+    });
   }
 
   private List<Address> getCurrentMembers(String groupId) {
@@ -294,16 +307,12 @@ public class GroupDatabase extends Database {
 
 
   public byte[] allocateGroupId() {
-    try {
-      byte[] groupId = new byte[16];
-      SecureRandom.getInstance("SHA1PRNG").nextBytes(groupId);
-      return groupId;
-    } catch (NoSuchAlgorithmException e) {
-      throw new AssertionError(e);
-    }
+    byte[] groupId = new byte[16];
+    new SecureRandom().nextBytes(groupId);
+    return groupId;
   }
 
-  public static class Reader {
+  public static class Reader implements Closeable {
 
     private final Cursor cursor;
 
@@ -337,6 +346,7 @@ public class GroupDatabase extends Database {
                              cursor.getInt(cursor.getColumnIndexOrThrow(MMS)) == 1);
     }
 
+    @Override
     public void close() {
       if (this.cursor != null)
         this.cursor.close();

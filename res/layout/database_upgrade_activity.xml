@@ -11,8 +11,8 @@
             android:layout_height="fill_parent"
             android:gravity="center" >
 
-        <LinearLayout android:paddingRight="16dip"
-                      android:paddingLeft="16dip"
+        <LinearLayout android:paddingEnd="16dip"
+                      android:paddingStart="16dip"
                       android:paddingTop="10dip"
                       android:layout_width="fill_parent"
                       android:layout_height="wrap_content"
@@ -34,7 +34,7 @@
                              android:layout_gravity="center"/>
 
             <ProgressBar android:id="@+id/determinate_progress"
-                         style="@android:style/Widget.ProgressBar.Horizontal"
+                         style="@style/Widget.AppCompat.ProgressBar.Horizontal"
                          android:layout_width="fill_parent"
                          android:layout_height="wrap_content"
                          android:indeterminate="false"

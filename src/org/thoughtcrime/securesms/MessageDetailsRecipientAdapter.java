@@ -1,14 +1,13 @@
 package org.thoughtcrime.securesms;
 
 import android.content.Context;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AbsListView;
 import android.widget.BaseAdapter;
 
-import org.thoughtcrime.securesms.crypto.MasterSecret;
 import org.thoughtcrime.securesms.database.model.MessageRecord;
 import org.thoughtcrime.securesms.mms.GlideRequests;
 import org.thoughtcrime.securesms.recipients.Recipient;
@@ -21,18 +20,16 @@ import java.util.List;
 class MessageDetailsRecipientAdapter extends BaseAdapter implements AbsListView.RecyclerListener {
 
   private final Context                       context;
-  private final MasterSecret                  masterSecret;
   private final GlideRequests                 glideRequests;
   private final MessageRecord                 record;
   private final List<RecipientDeliveryStatus> members;
   private final boolean                       isPushGroup;
 
-  MessageDetailsRecipientAdapter(@NonNull Context context, @NonNull MasterSecret masterSecret,
-                                 @NonNull GlideRequests glideRequests, @NonNull MessageRecord record,
-                                 @NonNull List<RecipientDeliveryStatus> members, boolean isPushGroup)
+  MessageDetailsRecipientAdapter(@NonNull Context context, @NonNull GlideRequests glideRequests,
+                                 @NonNull MessageRecord record, @NonNull List<RecipientDeliveryStatus> members,
+                                 boolean isPushGroup)
   {
     this.context       = context;
-    this.masterSecret  = masterSecret;
     this.glideRequests = glideRequests;
     this.record        = record;
     this.isPushGroup   = isPushGroup;
@@ -66,7 +63,7 @@ class MessageDetailsRecipientAdapter extends BaseAdapter implements AbsListView.
 
     RecipientDeliveryStatus member = members.get(position);
 
-    ((MessageRecipientListItem)convertView).set(masterSecret, glideRequests, record, member, isPushGroup);
+    ((MessageRecipientListItem)convertView).set(glideRequests, record, member, isPushGroup);
     return convertView;
   }
 
@@ -84,16 +81,22 @@ class MessageDetailsRecipientAdapter extends BaseAdapter implements AbsListView.
 
     private final Recipient recipient;
     private final Status    deliveryStatus;
+    private final boolean   isUnidentified;
     private final long      timestamp;
 
-    RecipientDeliveryStatus(Recipient recipient, Status deliveryStatus, long timestamp) {
+    RecipientDeliveryStatus(Recipient recipient, Status deliveryStatus, boolean isUnidentified, long timestamp) {
       this.recipient      = recipient;
       this.deliveryStatus = deliveryStatus;
+      this.isUnidentified = isUnidentified;
       this.timestamp      = timestamp;
     }
 
     Status getDeliveryStatus() {
       return deliveryStatus;
+    }
+
+    boolean isUnidentified() {
+      return isUnidentified;
     }
 
     public long getTimestamp() {

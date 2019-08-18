@@ -8,18 +8,18 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Vibrator;
-import android.support.annotation.NonNull;
 import android.text.TextUtils;
 import android.transition.TransitionInflater;
-import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+
 import org.thoughtcrime.securesms.crypto.IdentityKeyUtil;
-import org.thoughtcrime.securesms.crypto.MasterSecret;
 import org.thoughtcrime.securesms.crypto.ProfileKeyUtil;
+import org.thoughtcrime.securesms.logging.Log;
 import org.thoughtcrime.securesms.permissions.Permissions;
 import org.thoughtcrime.securesms.push.AccountManagerFactory;
 import org.thoughtcrime.securesms.qr.ScanListener;
@@ -60,7 +60,7 @@ public class DeviceActivity extends PassphraseRequiredActionBarActivity
   }
 
   @Override
-  public void onCreate(Bundle bundle, @NonNull MasterSecret masterSecret) {
+  public void onCreate(Bundle bundle, boolean ready) {
     getSupportActionBar().setDisplayHomeAsUpEnabled(true);
     getSupportActionBar().setTitle(R.string.AndroidManifest__linked_devices);
     this.deviceAddFragment  = new DeviceAddFragment();
@@ -71,10 +71,20 @@ public class DeviceActivity extends PassphraseRequiredActionBarActivity
     this.deviceAddFragment.setScanListener(this);
 
     if (getIntent().getBooleanExtra("add", false)) {
-      initFragment(android.R.id.content, deviceAddFragment, masterSecret, dynamicLanguage.getCurrentLocale());
+      initFragment(android.R.id.content, deviceAddFragment, dynamicLanguage.getCurrentLocale());
     } else {
-      initFragment(android.R.id.content, deviceListFragment, masterSecret, dynamicLanguage.getCurrentLocale());
+      initFragment(android.R.id.content, deviceListFragment, dynamicLanguage.getCurrentLocale());
     }
+
+    overridePendingTransition(R.anim.slide_from_end, R.anim.slide_to_start);
+  }
+
+  @Override
+  protected void onPause() {
+    if (isFinishing()) {
+      overridePendingTransition(R.anim.slide_from_start, R.anim.slide_to_end);
+    }
+    super.onPause();
   }
 
   @Override
@@ -180,6 +190,7 @@ public class DeviceActivity extends PassphraseRequiredActionBarActivity
           Optional<byte[]> profileKey        = Optional.of(ProfileKeyUtil.getProfileKey(getContext()));
 
           TextSecurePreferences.setMultiDevice(DeviceActivity.this, true);
+          TextSecurePreferences.setIsUnidentifiedDeliveryEnabled(context, false);
           accountManager.addDevice(ephemeralId, publicKey, identityKeyPair, profileKey, verificationCode);
 
           return SUCCESS;

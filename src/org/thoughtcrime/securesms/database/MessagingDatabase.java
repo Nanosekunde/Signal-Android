@@ -3,16 +3,21 @@ package org.thoughtcrime.securesms.database;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteOpenHelper;
 import android.text.TextUtils;
-import android.util.Log;
+
+import androidx.annotation.NonNull;
+
+import net.sqlcipher.database.SQLiteDatabase;
 
 import org.thoughtcrime.securesms.database.documents.Document;
 import org.thoughtcrime.securesms.database.documents.IdentityKeyMismatch;
 import org.thoughtcrime.securesms.database.documents.IdentityKeyMismatchList;
+import org.thoughtcrime.securesms.database.helpers.SQLCipherOpenHelper;
+import org.thoughtcrime.securesms.database.model.MessageRecord;
+import org.thoughtcrime.securesms.logging.Log;
 import org.thoughtcrime.securesms.util.JsonUtils;
 import org.whispersystems.libsignal.IdentityKey;
+import org.whispersystems.libsignal.util.guava.Optional;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -23,7 +28,7 @@ public abstract class MessagingDatabase extends Database implements MmsSmsColumn
 
   private static final String TAG = MessagingDatabase.class.getSimpleName();
 
-  public MessagingDatabase(Context context, SQLiteOpenHelper databaseHelper) {
+  public MessagingDatabase(Context context, SQLCipherOpenHelper databaseHelper) {
     super(context, databaseHelper);
   }
 
@@ -33,6 +38,7 @@ public abstract class MessagingDatabase extends Database implements MmsSmsColumn
   public abstract void markExpireStarted(long messageId, long startTime);
 
   public abstract void markAsSent(long messageId, boolean secure);
+  public abstract void markUnidentified(long messageId, boolean unidentified);
 
   public void setMismatchedIdentity(long messageId, final Address address, final IdentityKey identityKey) {
     List<IdentityKeyMismatch> items = new ArrayList<IdentityKeyMismatch>() {{

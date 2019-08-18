@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) 2012 Moxie Marlinspike
  *
  * This program is free software: you can redistribute it and/or modify
@@ -17,6 +17,7 @@
 package org.thoughtcrime.securesms.database.model;
 
 import android.content.Context;
+import androidx.annotation.NonNull;
 import android.text.SpannableString;
 
 import org.thoughtcrime.securesms.database.MmsSmsColumns;
@@ -33,23 +34,21 @@ import org.thoughtcrime.securesms.recipients.Recipient;
 
 public abstract class DisplayRecord {
 
-  protected final Context context;
   protected final long type;
 
   private final Recipient  recipient;
   private final long       dateSent;
   private final long       dateReceived;
   private final long       threadId;
-  private final Body       body;
+  private final String     body;
   private final int        deliveryStatus;
   private final int        deliveryReceiptCount;
   private final int        readReceiptCount;
 
-  public DisplayRecord(Context context, Body body, Recipient recipient, long dateSent,
-                       long dateReceived, long threadId, int deliveryStatus, int deliveryReceiptCount,
-                       long type, int readReceiptCount)
+  DisplayRecord(String body, Recipient recipient, long dateSent,
+                long dateReceived, long threadId, int deliveryStatus, int deliveryReceiptCount,
+                long type, int readReceiptCount)
   {
-    this.context              = context.getApplicationContext();
     this.threadId             = threadId;
     this.recipient            = recipient;
     this.dateSent             = dateSent;
@@ -61,8 +60,8 @@ public abstract class DisplayRecord {
     this.deliveryStatus       = deliveryStatus;
   }
 
-  public Body getBody() {
-    return body;
+  public @NonNull String getBody() {
+    return body == null ? "" : body;
   }
 
   public boolean isFailed() {
@@ -82,7 +81,7 @@ public abstract class DisplayRecord {
     return MmsSmsColumns.Types.isOutgoingMessageType(type);
   }
 
-  public abstract SpannableString getDisplayBody();
+  public abstract SpannableString getDisplayBody(@NonNull Context context);
 
   public Recipient getRecipient() {
     return recipient;
@@ -171,23 +170,5 @@ public abstract class DisplayRecord {
 
   public boolean isPendingInsecureSmsFallback() {
     return SmsDatabase.Types.isPendingInsecureSmsFallbackType(type);
-  }
-
-  public static class Body {
-    private final String body;
-    private final boolean plaintext;
-
-    public Body(String body, boolean plaintext) {
-      this.body      = body;
-      this.plaintext = plaintext;
-    }
-
-    public boolean isPlaintext() {
-      return plaintext;
-    }
-
-    public String getBody() {
-      return body == null ? "" : body;
-    }
   }
 }

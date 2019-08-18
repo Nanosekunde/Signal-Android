@@ -19,6 +19,7 @@ public interface MmsSmsColumns {
   public static final String EXPIRES_IN               = "expires_in";
   public static final String EXPIRE_STARTED           = "expire_started";
   public static final String NOTIFIED                 = "notified";
+  public static final String UNIDENTIFIED             = "unidentified";
 
   public static class Types {
     protected static final long TOTAL_MASK = 0xFFFFFFFF;
@@ -30,6 +31,8 @@ public interface MmsSmsColumns {
     protected static final long OUTGOING_CALL_TYPE                 = 2;
     protected static final long MISSED_CALL_TYPE                   = 3;
     protected static final long JOINED_TYPE                        = 4;
+    protected static final long UNSUPPORTED_MESSAGE_TYPE           = 5;
+    protected static final long INVALID_MESSAGE_TYPE               = 6;
 
     protected static final long BASE_INBOX_TYPE                    = 20;
     protected static final long BASE_OUTBOX_TYPE                   = 21;
@@ -71,10 +74,10 @@ public interface MmsSmsColumns {
     protected static final long GROUP_QUIT_BIT              = 0x20000;
     protected static final long EXPIRATION_TIMER_UPDATE_BIT = 0x40000;
 
-    // Encrypted Storage Information
-    protected static final long ENCRYPTION_MASK                  = 0xFF000000;
-    protected static final long ENCRYPTION_SYMMETRIC_BIT         = 0x80000000;
-    protected static final long ENCRYPTION_ASYMMETRIC_BIT        = 0x40000000;
+    // Encrypted Storage Information XXX
+    public    static final long ENCRYPTION_MASK                  = 0xFF000000;
+    // public    static final long ENCRYPTION_SYMMETRIC_BIT         = 0x80000000; Deprecated
+    // protected static final long ENCRYPTION_ASYMMETRIC_BIT        = 0x40000000; Deprecated
     protected static final long ENCRYPTION_REMOTE_BIT            = 0x20000000;
     protected static final long ENCRYPTION_REMOTE_FAILED_BIT     = 0x10000000;
     protected static final long ENCRYPTION_REMOTE_NO_SESSION_BIT = 0x08000000;
@@ -116,6 +119,10 @@ public interface MmsSmsColumns {
           (type & BASE_TYPE_MASK) == BASE_SENDING_TYPE;
     }
 
+    public static boolean isSentType(long type) {
+      return (type & BASE_TYPE_MASK) == BASE_SENT_TYPE;
+    }
+
     public static boolean isPendingSmsFallbackType(long type) {
       return (type & BASE_TYPE_MASK) == BASE_PENDING_INSECURE_SMS_FALLBACK ||
              (type & BASE_TYPE_MASK) == BASE_PENDING_SECURE_SMS_FALLBACK;
@@ -135,6 +142,14 @@ public interface MmsSmsColumns {
 
     public static boolean isJoinedType(long type) {
       return (type & BASE_TYPE_MASK) == JOINED_TYPE;
+    }
+
+    public static boolean isUnsupportedMessageType(long type) {
+      return (type & BASE_TYPE_MASK) == UNSUPPORTED_MESSAGE_TYPE;
+    }
+
+    public static boolean isInvalidMessageType(long type) {
+      return (type & BASE_TYPE_MASK) == INVALID_MESSAGE_TYPE;
     }
 
     public static boolean isSecureType(long type) {
@@ -209,14 +224,6 @@ public interface MmsSmsColumns {
       return (type & GROUP_QUIT_BIT) != 0;
     }
 
-    public static boolean isSymmetricEncryption(long type) {
-      return (type & ENCRYPTION_SYMMETRIC_BIT) != 0;
-    }
-
-    public static boolean isAsymmetricEncryption(long type) {
-      return (type & ENCRYPTION_ASYMMETRIC_BIT) != 0;
-    }
-
     public static boolean isFailedDecryptType(long type) {
       return (type & ENCRYPTION_REMOTE_FAILED_BIT) != 0;
     }
@@ -226,7 +233,7 @@ public interface MmsSmsColumns {
     }
 
     public static boolean isDecryptInProgressType(long type) {
-      return (type & ENCRYPTION_ASYMMETRIC_BIT) != 0;
+      return (type & 0x40000000) != 0; // Inline deprecated asymmetric encryption type
     }
 
     public static boolean isNoRemoteSessionType(long type) {

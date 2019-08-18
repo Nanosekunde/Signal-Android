@@ -8,40 +8,32 @@ import android.graphics.BitmapRegionDecoder;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.net.Uri;
-import android.support.annotation.NonNull;
-import android.util.Log;
 
 import com.davemorrissey.labs.subscaleview.decoder.ImageRegionDecoder;
 import com.davemorrissey.labs.subscaleview.decoder.SkiaImageRegionDecoder;
 
-import org.thoughtcrime.securesms.crypto.MasterSecret;
+import org.thoughtcrime.securesms.logging.Log;
 import org.thoughtcrime.securesms.mms.PartAuthority;
 
 import java.io.InputStream;
 
 public class AttachmentRegionDecoder implements ImageRegionDecoder {
 
-  private static final String TAG = AttachmentRegionDecoder.class.getName();
-
-  private final MasterSecret masterSecret;
+  private static final String TAG = AttachmentRegionDecoder.class.getSimpleName();
 
   private SkiaImageRegionDecoder passthrough;
 
   private BitmapRegionDecoder bitmapRegionDecoder;
 
-  public AttachmentRegionDecoder(@NonNull MasterSecret masterSecret) {
-    this.masterSecret = masterSecret;
-  }
-
   @Override
   public Point init(Context context, Uri uri) throws Exception {
-    Log.w(TAG, "Init!");
+    Log.d(TAG, "Init!");
     if (!PartAuthority.isLocalUri(uri)) {
       passthrough = new SkiaImageRegionDecoder();
       return passthrough.init(context, uri);
     }
 
-    InputStream inputStream = PartAuthority.getAttachmentStream(context, masterSecret, uri);
+    InputStream inputStream = PartAuthority.getAttachmentStream(context, uri);
 
     this.bitmapRegionDecoder = BitmapRegionDecoder.newInstance(inputStream, false);
     inputStream.close();
@@ -51,7 +43,7 @@ public class AttachmentRegionDecoder implements ImageRegionDecoder {
 
   @Override
   public Bitmap decodeRegion(Rect rect, int sampleSize) {
-    Log.w(TAG, "Decode region: " + rect);
+    Log.d(TAG, "Decode region: " + rect);
 
     if (passthrough != null) {
       return passthrough.decodeRegion(rect, sampleSize);
@@ -73,7 +65,7 @@ public class AttachmentRegionDecoder implements ImageRegionDecoder {
   }
 
   public boolean isReady() {
-    Log.w(TAG, "isReady");
+    Log.d(TAG, "isReady");
     return (passthrough != null && passthrough.isReady()) ||
            (bitmapRegionDecoder != null && !bitmapRegionDecoder.isRecycled());
   }

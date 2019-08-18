@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) 2012 Moxie Marlinspike
  *
  * This program is free software: you can redistribute it and/or modify
@@ -18,13 +18,13 @@
 package org.thoughtcrime.securesms.database.model;
 
 import android.content.Context;
+import androidx.annotation.NonNull;
 import android.text.SpannableString;
 
 import org.thoughtcrime.securesms.R;
 import org.thoughtcrime.securesms.database.MmsSmsColumns;
 import org.thoughtcrime.securesms.database.SmsDatabase;
 import org.thoughtcrime.securesms.database.documents.IdentityKeyMismatch;
-import org.thoughtcrime.securesms.database.documents.NetworkFailure;
 import org.thoughtcrime.securesms.recipients.Recipient;
 
 import java.util.LinkedList;
@@ -39,8 +39,8 @@ import java.util.List;
 
 public class SmsMessageRecord extends MessageRecord {
 
-  public SmsMessageRecord(Context context, long id,
-                          Body body, Recipient recipient,
+  public SmsMessageRecord(long id,
+                          String body, Recipient recipient,
                           Recipient individualRecipient,
                           int recipientDeviceId,
                           long dateSent, long dateReceived,
@@ -48,12 +48,12 @@ public class SmsMessageRecord extends MessageRecord {
                           long type, long threadId,
                           int status, List<IdentityKeyMismatch> mismatches,
                           int subscriptionId, long expiresIn, long expireStarted,
-                          int readReceiptCount)
+                          int readReceiptCount, boolean unidentified)
   {
-    super(context, id, body, recipient, individualRecipient, recipientDeviceId,
+    super(id, body, recipient, individualRecipient, recipientDeviceId,
           dateSent, dateReceived, threadId, status, deliveryReceiptCount, type,
-          mismatches, new LinkedList<NetworkFailure>(), subscriptionId,
-          expiresIn, expireStarted, readReceiptCount);
+          mismatches, new LinkedList<>(), subscriptionId,
+          expiresIn, expireStarted, readReceiptCount, unidentified);
   }
 
   public long getType() {
@@ -61,7 +61,7 @@ public class SmsMessageRecord extends MessageRecord {
   }
 
   @Override
-  public SpannableString getDisplayBody() {
+  public SpannableString getDisplayBody(@NonNull Context context) {
     if (SmsDatabase.Types.isFailedDecryptType(type)) {
       return emphasisAdded(context.getString(R.string.MessageDisplayHelper_bad_encrypted_message));
     } else if (isCorruptedKeyExchange()) {
@@ -78,18 +78,18 @@ public class SmsMessageRecord extends MessageRecord {
       return emphasisAdded(context.getString(R.string.ConversationItem_received_key_exchange_message_tap_to_process));
     } else if (SmsDatabase.Types.isDuplicateMessageType(type)) {
       return emphasisAdded(context.getString(R.string.SmsMessageRecord_duplicate_message));
-    } else if (SmsDatabase.Types.isDecryptInProgressType(type)) {
-      return emphasisAdded(context.getString(R.string.MessageDisplayHelper_decrypting_please_wait));
     } else if (SmsDatabase.Types.isNoRemoteSessionType(type)) {
       return emphasisAdded(context.getString(R.string.MessageDisplayHelper_message_encrypted_for_non_existing_session));
-    } else if (!getBody().isPlaintext()) {
-      return emphasisAdded(context.getString(R.string.MessageNotifier_locked_message));
     } else if (isEndSession() && isOutgoing()) {
       return emphasisAdded(context.getString(R.string.SmsMessageRecord_secure_session_reset));
     } else if (isEndSession()) {
       return emphasisAdded(context.getString(R.string.SmsMessageRecord_secure_session_reset_s, getIndividualRecipient().toShortString()));
+    } else if (SmsDatabase.Types.isUnsupportedMessageType(type)) {
+      return emphasisAdded(context.getString(R.string.SmsMessageRecord_this_message_could_not_be_processed_because_it_was_sent_from_a_newer_version));
+    } else if (SmsDatabase.Types.isInvalidMessageType(type)) {
+      return emphasisAdded(context.getString(R.string.SmsMessageRecord_error_handling_incoming_message));
     } else {
-      return super.getDisplayBody();
+      return super.getDisplayBody(context);
     }
   }
 

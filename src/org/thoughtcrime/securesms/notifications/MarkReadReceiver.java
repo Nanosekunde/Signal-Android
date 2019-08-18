@@ -1,18 +1,17 @@
 package org.thoughtcrime.securesms.notifications;
 
+import android.annotation.SuppressLint;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.AsyncTask;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v4.app.NotificationManagerCompat;
-import android.util.Log;
+import androidx.annotation.NonNull;
+import androidx.core.app.NotificationManagerCompat;
 
 import com.annimon.stream.Collectors;
 import com.annimon.stream.Stream;
 
 import org.thoughtcrime.securesms.ApplicationContext;
-import org.thoughtcrime.securesms.crypto.MasterSecret;
 import org.thoughtcrime.securesms.database.Address;
 import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.MessagingDatabase.ExpirationInfo;
@@ -20,22 +19,23 @@ import org.thoughtcrime.securesms.database.MessagingDatabase.MarkedMessageInfo;
 import org.thoughtcrime.securesms.database.MessagingDatabase.SyncMessageId;
 import org.thoughtcrime.securesms.jobs.MultiDeviceReadUpdateJob;
 import org.thoughtcrime.securesms.jobs.SendReadReceiptJob;
+import org.thoughtcrime.securesms.logging.Log;
 import org.thoughtcrime.securesms.service.ExpiringMessageManager;
 
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-public class MarkReadReceiver extends MasterSecretBroadcastReceiver {
+public class MarkReadReceiver extends BroadcastReceiver {
 
   private static final String TAG                   = MarkReadReceiver.class.getSimpleName();
   public static final  String CLEAR_ACTION          = "org.thoughtcrime.securesms.notifications.CLEAR";
   public static final  String THREAD_IDS_EXTRA      = "thread_ids";
   public static final  String NOTIFICATION_ID_EXTRA = "notification_id";
 
+  @SuppressLint("StaticFieldLeak")
   @Override
-  protected void onReceive(final Context context, Intent intent, @Nullable final MasterSecret masterSecret)
-  {
+  public void onReceive(final Context context, Intent intent) {
     if (!CLEAR_ACTION.equals(intent.getAction()))
       return;
 
@@ -50,14 +50,14 @@ public class MarkReadReceiver extends MasterSecretBroadcastReceiver {
           List<MarkedMessageInfo> messageIdsCollection = new LinkedList<>();
 
           for (long threadId : threadIds) {
-            Log.w(TAG, "Marking as read: " + threadId);
+            Log.i(TAG, "Marking as read: " + threadId);
             List<MarkedMessageInfo> messageIds = DatabaseFactory.getThreadDatabase(context).setRead(threadId, true);
             messageIdsCollection.addAll(messageIds);
           }
 
           process(context, messageIdsCollection);
 
-          MessageNotifier.updateNotification(context, masterSecret);
+          MessageNotifier.updateNotification(context);
 
           return null;
         }
@@ -77,7 +77,7 @@ public class MarkReadReceiver extends MasterSecretBroadcastReceiver {
 
     ApplicationContext.getInstance(context)
                       .getJobManager()
-                      .add(new MultiDeviceReadUpdateJob(context, syncMessageIds));
+                      .add(new MultiDeviceReadUpdateJob(syncMessageIds));
 
     Map<Address, List<SyncMessageId>> addressMap = Stream.of(markedReadMessages)
                                                          .map(MarkedMessageInfo::getSyncMessageId)
@@ -88,7 +88,7 @@ public class MarkReadReceiver extends MasterSecretBroadcastReceiver {
 
       ApplicationContext.getInstance(context)
                         .getJobManager()
-                        .add(new SendReadReceiptJob(context, address, timestamps));
+                        .add(new SendReadReceiptJob(address, timestamps));
     }
   }
 
